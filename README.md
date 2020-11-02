@@ -103,11 +103,18 @@ Referência:
 $ aws rds describe-db-instances --db-instance-identifier mysql-inst-01 | grep Address
 ```
 
-##### Conectando ao Banco de Dados para testar.
-
+##### Conectando ao banco de dados, criando tabela e inserindo registros
 ```
 $ mysql -u root -h [host identificado com o comando aws rds describe-db-instances] -p
 Enter password: mysql.rootp4ss
+
+mysql> USE mysqldb;
+
+mysql> CREATE TABLE tabela (id int(11) NOT NULL AUTO_INCREMENT, coluna varchar(255) NOT NULL, PRIMARY KEY (id));
+
+mysql> INSERT INTO tabela (coluna) VALUES ('Hello World');
+
+mysql> exit
 ```
 
 #### Elastic Beanstalk
@@ -197,7 +204,6 @@ Referência: [https://docs.aws.amazon.com/pt_br/elasticbeanstalk/latest/dg/envir
 $ cd ~
 $ git clone https://github.com/luiarantes/PHP-MySql-HelloWorld.git
 $ cd ~/PHP-MySql-HelloWorld
-$ echo "<?php mysqli_connect("db", \"user\", \"pass\") or die(mysqli_error()); ?>" >> db.php
 $ eb init
 
   1) us-east-1 : US East (N. Virginia)
@@ -223,15 +229,16 @@ Resultado esperado antes de realizar o deploy
 ```
 $ eb deploy
 ```
-O deploy foi efetuado porém não existe conexão com o banco de dados de produção, o que iremos fazer agora, e depois realizar um novo deploy para o update.
+O deploy foi efetuado porém não existe conexão com o banco de dados de produção, pois o arquivo com as credenciais não pode ser armazenado no repositório remoto, vamos criar o arquivo agora e depois realizar um novo deploy
 
 ### Alterar caminho para conexão com banco de dados
 
 ```
 $ cd ~/PHP-MySql-HelloWorld
-$ _DB=$(aws rds describe-db-instances --db-instance-identifier mysql-inst-01 | grep Address | awk '{ print $2 }')
-$ echo "<?php mysqli_connect($_DB \"root\", \"mysql.rootp4ss\") or die(mysqli_error()); ?>" > db.php
+$ _DB=$(aws rds describe-db-instances --db-instance-identifier mysql-inst-01 | grep Address | awk '{ print $2 }' | sed 's/,//' | sed 's/\"//' | sed 's/"//')
+$ echo "<?php \$HOST=\"$_DB\"; \$USER=\"root\"; \$PASS=\"mysql.rootp4ss\"; \$DB=\"mysqldb\"; ?>" > ~/PHP-MySql-HelloWorld/db-vars.php
 ```
+
 ##### Definir nome de usuário e endereço de e-mail
 
 ```
@@ -243,7 +250,7 @@ $ echo ".gitignore" >> .gitignore
 ##### Realizando deploy de atualização
 
 ```
-$ git add db.php
+$ git add db-vars.php
 $ git commit -m "Add Host MySql"
 $ eb deploy
 ```
@@ -255,15 +262,15 @@ $ eb deploy
 ##### Para remover todo o ambiente utilize os comandos abaixo:
 
 ```
+$ aws rds delete-db-instance \
+--db-instance-identifier mysql-inst-01 \
+--skip-final-snapshot \
+--delete-automated-backups
+
 $ cd ~/PHP-MySql-HelloWorld
 $ eb terminate
 
 To confirm, type the environment name: HelloWorld-Prod
 
 $ aws elasticbeanstalk delete-application --application-name HelloWorld
-
-$ aws rds delete-db-instance \
---db-instance-identifier mysql-inst-01 \
---skip-final-snapshot \
---delete-automated-backups
 ```
